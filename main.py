@@ -63,6 +63,7 @@ def plotSGDPath(trainX, trainY, ws):
 
 def relu(X):
     X[X < 0] = 0
+    X[X >= 1] = 1
     return X
 
 
@@ -75,9 +76,9 @@ def softmax(x):
 def predict(X, w):
     W1, b1, W2, b2 = unpack(w)
 
-    z1 = W1.dot(X) + b1
+    z1 = W1.T.dot(X.T).T + b1
     h1 = relu(z1)
-    z2 = W2.dot(h1) + b2
+    z2 = W2.T.dot(h1.T).T + b2
     yhat = softmax(z2)
 
     return yhat
@@ -88,7 +89,7 @@ def predict(X, w):
 
 
 def fCE(X, Y, w):
-    cost = (-1/X.shape[0]) * np.sum(Y * predict(X, w))
+    cost = (1/X.shape[0]) * np.sum(Y * predict(X, w))
     return cost
 
 # Given training images X, associated labels Y, and a vector of combined weights
@@ -107,14 +108,14 @@ def gradCE(X, Y, w):
 
     yHatMinusY = yhat - Y
 
-    g = ((yHatMinusY.T @ W2.T).T *relu(z1.T)).T
+    g = ((yHatMinusY @ W2.T).T *relu(z1.T)).T
 
-    grad_w2 = yHatMinusY @ h1.T
-    grad_b2 = yHatMinusY
-    grad_w1 = g @ X.T
-    grad_b1 = g
+    grad_w2 = (yHatMinusY.T @ h1).T
+    grad_b2 = yHatMinusY.T
+    grad_w1 = (g.T @ X).T
+    grad_b1 = g.T
 
-    return pack(grad_w2, grad_b2, grad_w1, grad_b1)
+    return pack(grad_w1, grad_b1, grad_w2, grad_b2)
 
 # Given training and testing datasets and an initial set of weights/biases b,
 # train the NN. Then return the sequence of w's obtained during SGD.
@@ -157,8 +158,8 @@ def train(X, y, testX, testY, w, E=100, alpha=0.1, n_hat=16):
 if __name__ == "__main__":
     # Load data
     if "trainX" not in globals():
-        trainX, trainY=loadData("train")
-        testX, testY=loadData("test")
+        trainX, trainY = loadData("train")
+        testX, testY = loadData("test")
 
     # Initialize weights randomly
     W1=2*(np.random.random(size=(NUM_INPUT, NUM_HIDDEN)) / \
@@ -171,9 +172,9 @@ if __name__ == "__main__":
 
     # Check that the gradient is correct on just a few examples (randomly drawn).
     idxs=np.random.permutation(trainX.shape[0])[0:NUM_CHECK]
-    print(scipy.optimize.check_grad(lambda w_: fCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_), \
-                                    lambda w_: gradCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_), \
-                                    w))
+    f = lambda w_: fCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_)
+    grad = lambda w_: gradCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_)
+    print(scipy.optimize.check_grad(f, grad, w))
 
     # Train the network and obtain the sequence of w's obtained using SGD.
     ws = train(trainX, trainY, testX, testY, w)

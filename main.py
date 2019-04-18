@@ -61,8 +61,9 @@ def plotSGDPath(trainX, trainY, ws):
     plt.show()
 
 
-def relu(X):
+def reluPrime(X):
     X[X < 0] = 0
+    X[X >= 1] = 1
     return X
 
 
@@ -75,11 +76,12 @@ def softmax(x):
 def predict(X, w):
     W1, b1, W2, b2 = unpack(w)
 
-    z1 = W1.dot(X) + b1
-    h1 = relu(z1)
-    z2 = W2.dot(h1) + b2
+    
+    z1 = (W1.T.dot(X.T).T + b1).T# Change b1 to column vector
+    h1 = reluPrime(z1)
+    z2 = (W2.T.dot(h1).T + b2).T # Change b2 to column vector
     yhat = softmax(z2)
-
+    ## yHat is many results in one there X.shape[0] by 10
     return yhat
 # Given training images X, associated labels Y, and a vector of combined weights
 # and bias terms w, compute and return the cross-entropy (CE) loss. You might
@@ -88,7 +90,7 @@ def predict(X, w):
 
 
 def fCE(X, Y, w):
-    cost = (-1/X.shape[0]) * np.sum(Y * predict(X, w))
+    cost = (1/X.shape[1]) * np.sum(Y.T * np.log(predict(X, w)))
     return cost
 
 # Given training images X, associated labels Y, and a vector of combined weights
@@ -100,19 +102,19 @@ def fCE(X, Y, w):
 def gradCE(X, Y, w):
     W1, b1, W2, b2 = unpack(w)
 
-    z1 = W1.T.dot(X.T).T + b1
-    h1 = relu(z1)
-    z2 = W2.T.dot(h1.T).T + b2
+    z1 = (W1.T.dot(X.T).T + b1).T# Change b1 to column vector
+    h1 = reluPrime(z1)
+    z2 = (W2.T.dot(h1).T + b2).T # Change b2 to column vector
     yhat = softmax(z2)
 
-    yHatMinusY = yhat - Y
+    yHatMinusY = (yhat.T - Y).T
 
-    g = ((yHatMinusY.T @ W2.T).T *relu(z1.T)).T
+    g = ((yHatMinusY.T @ W2.T) * reluPrime(z1.T))
 
     grad_w2 = yHatMinusY @ h1.T
     grad_b2 = yHatMinusY
-    grad_w1 = g @ X.T
-    grad_b1 = g
+    grad_w1 = g.T @ X
+    grad_b1 = g.T
 
     return pack(grad_w2, grad_b2, grad_w1, grad_b1)
 
@@ -122,8 +124,8 @@ def gradCE(X, Y, w):
 
 def train(X, y, testX, testY, w, E=100, alpha=0.1, n_hat=16):
 
-    m = len()  # m is number of features
-    n = len(X[0])  # n is number of training images
+    m = X.shape[0]  # m is number of features
+    n = X.shape[1]  # n is number of training images
 
     # Shuffle X and y in unison https://stackoverflow.com/a/4602224/6291504
     p = np.random.permutation(n)
@@ -136,12 +138,13 @@ def train(X, y, testX, testY, w, E=100, alpha=0.1, n_hat=16):
             X_batch = X[:, i:i+n_hat]
             y_batch = y[i:i+n_hat]
 
-            grad_w2, grad_b2, grad_w1, grad_b1 = unpack(gradCE(X_batch, y_batch, w))
+            grad_w2, grad_b2, grad_w1, grad_b1 = unpack(
+                gradCE(X_batch, y_batch, w))
             W1, b1, W2, b2 = unpack(w)
-            W2 -= (alpha/n)*grad_w2 + (alpha / n) * W2
-            b2 -= (alpha/n)*grad_b2 + (alpha / n) * b2
-            W1 -= (alpha/n)*grad_w1 + (alpha / n) * W1
-            b1 -= (alpha/n)*grad_b1 + (alpha / n) * b1
+            W2 -= grad_w2 + W2
+            b2 -= grad_b2 + b2
+            W1 -= grad_w1 + W1
+            b1 -= grad_b1 + b1
             w = pack(W1, b1, W2, b2)
 
             w_history.append(w)
@@ -151,28 +154,30 @@ def train(X, y, testX, testY, w, E=100, alpha=0.1, n_hat=16):
     np.save('W1.npy', W1)
     np.save('b1.npy', b1)
 
-
     return w_history
+
 
 if __name__ == "__main__":
     # Load data
     if "trainX" not in globals():
-        trainX, trainY=loadData("train")
-        testX, testY=loadData("test")
+        trainX, trainY = loadData("train")
+        testX, testY = loadData("test")
 
     # Initialize weights randomly
-    W1=2*(np.random.random(size=(NUM_INPUT, NUM_HIDDEN)) / \
-          NUM_INPUT**0.5) - 1./NUM_INPUT**0.5
-    b1=0.01 * np.ones(NUM_HIDDEN)
-    W2=2*(np.random.random(size=(NUM_HIDDEN, NUM_OUTPUT)) / \
-          NUM_HIDDEN**0.5) - 1./NUM_HIDDEN**0.5
-    b2=0.01 * np.ones(NUM_OUTPUT)
-    w=pack(W1, b1, W2, b2)
+    W1 = 2*(np.random.random(size=(NUM_INPUT, NUM_HIDDEN))/NUM_INPUT**0.5) - 1./NUM_INPUT**0.5
+    b1 = 0.01 * np.ones(NUM_HIDDEN)
+    W2 = 2*(np.random.random(size=(NUM_HIDDEN, NUM_OUTPUT))/NUM_HIDDEN**0.5) - 1./NUM_HIDDEN**0.5
+    b2 = 0.01 * np.ones(NUM_OUTPUT)
+    w = pack(W1, b1, W2, b2)
 
-    # Check that the gradient is correct on just a few examples (randomly drawn).
-    idxs=np.random.permutation(trainX.shape[0])[0:NUM_CHECK]
-    print(scipy.optimize.check_grad(lambda w_: fCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_), \
-                                    lambda w_: gradCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_), \
+    
+   
+
+    # Check that the gradient is correct on just a few examples (randomly drawn)## Use check grad on each individualW1, W2, b1, b2
+    idxs = np.random.permutation(trainX.shape[0])[0:NUM_CHECK]
+    print(scipy.optimize.check_grad(lambda w_: fCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_),
+                                    lambda w_: gradCE(np.atleast_2d(
+                                        trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_),
                                     w))
 
     # Train the network and obtain the sequence of w's obtained using SGD.

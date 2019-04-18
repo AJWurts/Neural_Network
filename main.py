@@ -29,8 +29,8 @@ def pack(W1, b1, W2, b2):
 
 
 def loadData(which):
-    images = np.load("small_mnist_{}_images.npy".format(which))
-    labels = np.load("small_mnist_{}_labels.npy".format(which))
+    images = np.load("mnist_{}_images.npy".format(which))
+    labels = np.load("mnist_{}_labels.npy".format(which))
     return images, labels
 
 
@@ -75,8 +75,9 @@ def softmax(x):
 
 def predict(X, w):
     W1, b1, W2, b2 = unpack(w)
+    X = X.T
 
-    z1 = W1.T.dot(X.T).T + b1
+    z1 = W1.dot(X).T + b1
     h1 = relu(z1)
     z2 = W2.T.dot(h1.T).T + b2
     yhat = softmax(z2)
@@ -101,31 +102,28 @@ def fCE(X, Y, w):
 def gradCE(X, Y, w):
     W1, b1, W2, b2 = unpack(w)
 
-    z1 = W1.T.dot(X.T).T + b1
+
+    z1 = W1.dot(X).T + b1
     h1 = relu(z1)
     z2 = W2.T.dot(h1.T).T + b2
     yhat = softmax(z2)
 
     yHatMinusY = yhat - Y
 
-    g = ((yHatMinusY @ W2.T).T *relu(z1.T)).T
+    g = ((yHatMinusY @ W2.T) * relu(z1)).T
 
-    grad_w2 = (yHatMinusY.T @ h1).T
-    grad_b2 = yHatMinusY.T
-    grad_w1 = (g.T @ X).T
+    grad_w2 = yHatMinusY.T @ h1
+    grad_b2 = yHatMinusY
+    grad_w1 = g @ X.T
     grad_b1 = g.T
-
     return pack(grad_w1, grad_b1, grad_w2, grad_b2)
 
 # Given training and testing datasets and an initial set of weights/biases b,
 # train the NN. Then return the sequence of w's obtained during SGD.
-
-
 def train(X, y, testX, testY, w, E=100, alpha=0.1, n_hat=16):
-
-    m = len()  # m is number of features
-    n = len(X[0])  # n is number of training images
-
+    m = X.shape[0]
+    n = X.shape[1]# n is number of training images
+    X = X.T
     # Shuffle X and y in unison https://stackoverflow.com/a/4602224/6291504
     p = np.random.permutation(n)
     X, y = X[:, p], y[p]
@@ -136,13 +134,13 @@ def train(X, y, testX, testY, w, E=100, alpha=0.1, n_hat=16):
                 n_hat = n - i
             X_batch = X[:, i:i+n_hat]
             y_batch = y[i:i+n_hat]
-
-            grad_w2, grad_b2, grad_w1, grad_b1 = unpack(gradCE(X_batch, y_batch, w))
+            print(fCE(X, y, w))
+            grad_w1, grad_b1, grad_w2, grad_b2 = unpack(gradCE(X_batch, y_batch, w))
             W1, b1, W2, b2 = unpack(w)
-            W2 -= (alpha/n)*grad_w2 + (alpha / n) * W2
-            b2 -= (alpha/n)*grad_b2 + (alpha / n) * b2
-            W1 -= (alpha/n)*grad_w1 + (alpha / n) * W1
-            b1 -= (alpha/n)*grad_b1 + (alpha / n) * b1
+            W2 -= (alpha/n_hat)*grad_w2.T + (alpha / W2.shape[0]) * W2
+            b2 -= np.sum((alpha/n_hat)*grad_b2, axis=0) + (alpha / b2.shape[0]) * b2
+            W1 -= (alpha/n_hat)*grad_w1 + (alpha / W1.shape[0]) * W1
+            b1 -= np.sum((alpha/n_hat)*grad_b1, axis=0) + (alpha / b1.shape[0]) * b1
             w = pack(W1, b1, W2, b2)
 
             w_history.append(w)
@@ -162,7 +160,7 @@ if __name__ == "__main__":
         testX, testY = loadData("test")
 
     # Initialize weights randomly
-    W1=2*(np.random.random(size=(NUM_INPUT, NUM_HIDDEN)) / \
+    W1=2*(np.random.random(size=(NUM_HIDDEN, NUM_INPUT)) / \
           NUM_INPUT**0.5) - 1./NUM_INPUT**0.5
     b1=0.01 * np.ones(NUM_HIDDEN)
     W2=2*(np.random.random(size=(NUM_HIDDEN, NUM_OUTPUT)) / \
@@ -170,11 +168,11 @@ if __name__ == "__main__":
     b2=0.01 * np.ones(NUM_OUTPUT)
     w=pack(W1, b1, W2, b2)
 
-    # Check that the gradient is correct on just a few examples (randomly drawn).
-    idxs=np.random.permutation(trainX.shape[0])[0:NUM_CHECK]
-    f = lambda w_: fCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_)
-    grad = lambda w_: gradCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_)
-    print(scipy.optimize.check_grad(f, grad, w))
+    # # Check that the gradient is correct on just a few examples (randomly drawn).
+    # idxs=np.random.permutation(trainX.shape[0])[0:NUM_CHECK]
+    # f = lambda w_: fCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_)
+    # grad = lambda w_: gradCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_)
+    # print(scipy.optimize.check_grad(f, grad, w))
 
     # Train the network and obtain the sequence of w's obtained using SGD.
     ws = train(trainX, trainY, testX, testY, w)

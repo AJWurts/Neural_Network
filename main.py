@@ -29,8 +29,8 @@ def pack(W1, b1, W2, b2):
 
 
 def loadData(which):
-    images = np.load("small_mnist_{}_images.npy".format(which))
-    labels = np.load("small_mnist_{}_labels.npy".format(which))
+    images = np.load("mnist_{}_images.npy".format(which))
+    labels = np.load("mnist_{}_labels.npy".format(which))
     return images, labels
 
 
@@ -75,11 +75,12 @@ def softmax(x):
 
 def predict(X, w):
     W1, b1, W2, b2 = unpack(w)
-
+    X = X.T
     
     z1 = (W1.T.dot(X.T).T + b1).T# Change b1 to column vector
     h1 = reluPrime(z1)
     z2 = (W2.T.dot(h1).T + b2).T # Change b2 to column vector
+
     yhat = softmax(z2)
     ## yHat is many results in one there X.shape[0] by 10
     return yhat
@@ -90,7 +91,9 @@ def predict(X, w):
 
 
 def fCE(X, Y, w):
+
     cost = (1/X.shape[1]) * np.sum(Y.T * np.log(predict(X, w)))
+
     return cost
 
 # Given training images X, associated labels Y, and a vector of combined weights
@@ -109,19 +112,17 @@ def gradCE(X, Y, w):
 
     yHatMinusY = (yhat.T - Y).T
 
-    g = ((yHatMinusY.T @ W2.T) * reluPrime(z1.T))
+    g = ((yHatMinusY.T @ W2.T) * reluPrime(z1.T)).T
 
-    grad_w2 = yHatMinusY @ h1.T
+    grad_w2 = yHatMinusY.T @ h1
     grad_b2 = yHatMinusY
-    grad_w1 = g.T @ X
-    grad_b1 = g.T
+    grad_w1 = g @ X
+    grad_b1 = g
 
     return pack(grad_w2, grad_b2, grad_w1, grad_b1)
 
 # Given training and testing datasets and an initial set of weights/biases b,
 # train the NN. Then return the sequence of w's obtained during SGD.
-
-
 def train(X, y, testX, testY, w, E=100, alpha=0.1, n_hat=16):
 
     m = X.shape[0]  # m is number of features

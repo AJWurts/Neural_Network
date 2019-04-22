@@ -129,16 +129,16 @@ def gradCE(X, Y, w):
     z2 = (W2.T.dot(h1.T).T + b2)
     yhat = softmax(z2)
 
-    yHatMinusY = yhat.T - Y
+    yHatMinusY = yhat - Y.T
 
-    g = ((yHatMinusY @ W2.T) * reluPrime(z1.T)).T
+    g = ((yHatMinusY.T @ W2.T) * reluPrime(z1)).T
 
-    grad_w2 = yHatMinusY.T @ h1
-    grad_b2 = np.mean(yHatMinusY, axis=0)
-    grad_w1 = g.T @ X
-    grad_b1 = np.mean(g, axis=0)
+    grad_w2 = yHatMinusY @ h1
+    grad_b2 = np.mean(yHatMinusY, axis=1)
+    grad_w1 = g @ X
+    grad_b1 = np.mean(g, axis=1)
 
-    return pack(grad_w1, grad_b1, grad_w2, grad_b2)
+    return pack(grad_w1.T, grad_b1, grad_w2.T, grad_b2)
 
 
 def oneForwardProp(X, Y, w):
@@ -242,10 +242,10 @@ if __name__ == "__main__":
     # Check that the gradient is correct on just a few examples (randomly drawn)## Use check grad on each individualW1, W2, b1, b2
 
     idxs = np.random.permutation(trainX.shape[0])[0:NUM_CHECK]
-    # print(scipy.optimize.check_grad(lambda w_: fCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_),
-    #                                 lambda w_: gradCE(np.atleast_2d(
-    #                                     trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_),
-    #                                 w))
+    print(scipy.optimize.check_grad(lambda w_: fCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_),
+                                    lambda w_: gradCE(np.atleast_2d(
+                                        trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_),
+                                    w))
     W1g, b1t, W2t, b2t = unpack(gradCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w))
     W1a, b1a, W2a, b2a = unpack(scipy.optimize.approx_fprime(w, lambda w_: fCE(np.atleast_2d(
         trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_), 1.49e-08))

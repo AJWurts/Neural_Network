@@ -121,7 +121,7 @@ def gradCE(X, Y, w):
 
     return np.array([grad_w1, grad_b1, grad_w2, grad_b2])
 
-def oneForwardProp(X, w):
+def oneForwardProp(X, Y, w):
     W1, b1, W2, b2 = unpack(w)
 
     z1 = W1.dot(X) + b1
@@ -129,15 +129,15 @@ def oneForwardProp(X, w):
     z2 = W2.dot(h1) + b2
     yhat = softmax(z2)
 
-    
-    # yHatMinusY = yhat - 
 
-    # g = ((yHatMinusY @ W2.T) * reluPrime(z1.T)).T
+    yHatMinusY = yhat - Y
 
-    # grad_w2 = yHatMinusY.T @ h1.T
-    # grad_b2 = yHatMinusY 
-    # grad_w1 = g @ X.T
-    # grad_b1 = g
+    g = ((yHatMinusY @ W2.T) * reluPrime(z1.T)).T
+
+    grad_w2 = yHatMinusY.T @ h1.T
+    grad_b2 = yHatMinusY 
+    grad_w1 = g @ X.T
+    grad_b1 = g
 
 
 def backprop(X, Y, w):

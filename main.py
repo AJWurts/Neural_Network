@@ -8,13 +8,29 @@ NUM_HIDDEN = 40  # Number of hidden neurons
 NUM_OUTPUT = 10  # Number of output neurons
 NUM_CHECK = 5  # Number of examples on which to check the gradient
 
+"""
+    W1 = 2*(np.random.random(size=(NUM_INPUT, NUM_HIDDEN)) /
+            NUM_INPUT**0.5) - 1./NUM_INPUT**0.5
+    b1 = 0.01 * np.ones(NUM_HIDDEN)
+    W2 = 2*(np.random.random(size=(NUM_HIDDEN, NUM_OUTPUT)) /
+            NUM_HIDDEN**0.5) - 1./NUM_HIDDEN**0.5
+    b2 = 0.01 * np.ones(NUM_OUTPUT)
+    w = pack(W1, b1, W2, b2)
+    W1t, b1t, W2t, b2t = unpack(pack(W1, b1, W2, b2))"""
+
 # Given a vector w containing all the weights and biased vectors, extract
 # and return the individual weights and biases W1, b1, W2, b2.
 # This is useful for performing a gradient check with check_grad.
 
 
 def unpack(w):
-    return w[0], w[1], w[2], w[3]
+    W1 = w[:NUM_INPUT * NUM_HIDDEN].reshape((NUM_INPUT, NUM_HIDDEN))
+    b1 = w[NUM_INPUT * NUM_HIDDEN:NUM_INPUT *
+           NUM_HIDDEN + NUM_HIDDEN].reshape((NUM_HIDDEN,))
+    W2 = w[-(NUM_OUTPUT * NUM_HIDDEN + 10):-
+           NUM_OUTPUT].reshape((NUM_HIDDEN, NUM_OUTPUT))
+    b2 = w[-NUM_OUTPUT:]
+    return W1, b1, W2, b2
     # return W1, b1, W2, b2
 
 # Given individual weights and biases W1, b1, W2, b2, concatenate them and
@@ -23,7 +39,10 @@ def unpack(w):
 
 
 def pack(W1, b1, W2, b2):
-    return [W1, b1, W2, b2]
+    w1_flattened = W1.reshape((W1.shape[0] * W1.shape[1],))
+    w2_flattened = W2.reshape((W2.shape[0] * W2.shape[1],))
+    result = np.concatenate((w1_flattened, b1, w2_flattened, b2))
+    return result
 
 # Load the images and labels from a specified dataset (train or test).
 
@@ -62,21 +81,21 @@ def plotSGDPath(trainX, trainY, ws):
 
 
 def reluPrime(X):
-    return np.where(X > 0, 1.0, 0.0)
+    return np.where(X >= 0, 1.0, 0.0)
 
 
 def softmax(x):
     exp = np.exp(x)
-    exp_sum = np.sum(exp, axis=0)
-    return (exp / exp_sum).T
+    exp_sum = np.sum(exp, axis=1)
+    return (exp.T / exp_sum)
 
 
 def predict(X, w):
     W1, b1, W2, b2 = unpack(w)
 
-    z1 = (W1.T.dot(X).T + b1).T  # Change b1 to column vector
+    z1 = (W1.T.dot(X.T).T + b1).T
     h1 = reluPrime(z1)
-    z2 = (W2.T.dot(h1).T + b2).T  # Change b2 to column vector
+    z2 = (W2.T.dot(h1).T + b2).T
     yhat = softmax(z2)
     # yHat is many results in one there X.shape[0] by 10
     return yhat
@@ -105,21 +124,22 @@ def score(X, y, w):
 def gradCE(X, Y, w):
     W1, b1, W2, b2 = unpack(w)
 
-    z1 = (W1.T.dot(X).T + b1).T
+    z1 = (W1.T.dot(X.T).T + b1)
     h1 = reluPrime(z1)
-    z2 = (W2.T.dot(h1).T + b2).T
+    z2 = (W2.T.dot(h1.T).T + b2)
     yhat = softmax(z2)
 
-    yHatMinusY = yhat - Y
+    yHatMinusY = yhat.T - Y
 
     g = ((yHatMinusY @ W2.T) * reluPrime(z1.T)).T
 
-    grad_w2 = yHatMinusY.T @ h1.T
-    grad_b2 = yHatMinusY 
-    grad_w1 = g @ X.T
-    grad_b1 = g
+    grad_w2 = yHatMinusY.T @ h1
+    grad_b2 = np.mean(yHatMinusY, axis=0)
+    grad_w1 = g.T @ X
+    grad_b1 = np.mean(g, axis=0)
 
-    return np.array([grad_w1, grad_b1, grad_w2, grad_b2])
+    return pack(grad_w1, grad_b1, grad_w2, grad_b2)
+
 
 def oneForwardProp(X, Y, w):
     W1, b1, W2, b2 = unpack(w)
@@ -129,13 +149,12 @@ def oneForwardProp(X, Y, w):
     z2 = W2.dot(h1) + b2
     yhat = softmax(z2)
 
-
     yHatMinusY = yhat - Y
 
     g = ((yHatMinusY @ W2.T) * reluPrime(z1.T)).T
 
     grad_w2 = yHatMinusY.T @ h1.T
-    grad_b2 = yHatMinusY 
+    grad_b2 = yHatMinusY
     grad_w1 = g @ X.T
     grad_b1 = g
 
@@ -157,10 +176,12 @@ def backprop(X, Y, w):
     grad_w1 = g @ X.T
     grad_b1 = np.mean(g, axis=1)
 
-    return [grad_w1, grad_b1, grad_w2, grad_b2]
+    return pack(w)  # [grad_w1, grad_b1, grad_w2, grad_b2]
 
 # Given training and testing datasets and an initial set of weights/biases b,
 # train the NN. Then return the sequence of w's obtained during SGD.
+
+
 def train(X, y, testX, testY, w, E=30, alpha=0.00000, beta=0.00001, kappa=0.0025, n_hat=64):
 
     m = X.shape[0]  # m is number of features
@@ -191,9 +212,6 @@ def train(X, y, testX, testY, w, E=30, alpha=0.00000, beta=0.00001, kappa=0.0025
         print("Epoch:", j)
         print(score(testX, testY, w))
         print(fCE(X, y, w))
-        
-
- 
 
     np.save('W2.npy', W2)
     np.save('b2.npy', b2)
@@ -219,17 +237,24 @@ if __name__ == "__main__":
             NUM_HIDDEN**0.5) - 1./NUM_HIDDEN**0.5
     b2 = 0.01 * np.ones(NUM_OUTPUT)
     w = pack(W1, b1, W2, b2)
+    W1t, b1t, W2t, b2t = unpack(pack(W1, b1, W2, b2))
 
     # Check that the gradient is correct on just a few examples (randomly drawn)## Use check grad on each individualW1, W2, b1, b2
 
     idxs = np.random.permutation(trainX.shape[0])[0:NUM_CHECK]
-    print(fCE(np.atleast_2d(trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w))
-    print(scipy.optimize.check_grad(lambda w_: fCE(np.atleast_2d(trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w_),
-                                    lambda w_: gradCE(np.atleast_2d(
-                                        trainX[idxs, :]).T, np.atleast_2d(trainY[idxs, :]), w_),
-                                    w))
+    # print(scipy.optimize.check_grad(lambda w_: fCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_),
+    #                                 lambda w_: gradCE(np.atleast_2d(
+    #                                     trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_),
+    #                                 w))
+    W1g, b1t, W2t, b2t = unpack(gradCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w))
+    W1a, b1a, W2a, b2a = unpack(scipy.optimize.approx_fprime(w, lambda w_: fCE(np.atleast_2d(
+        trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_), 1.49e-08))
+    print("W1: ", np.sum(W1t - W1a))
+    print("b1: ", np.sum(b1t - b1a))
+    print("W2: ", np.sum(W2t - W2a))
+    print("b2: ", np.sum(b2t - b2a))
 
-    # # Train the network and obtain the sequence of w's obtained using SGD.
+    # # # Train the network and obtain the sequence of w's obtained using SGD.
     # ws = train(trainX.T, trainY, optX.T, optY, w)
 
     # # Plot the SGD trajectory

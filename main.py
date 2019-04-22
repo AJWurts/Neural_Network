@@ -109,7 +109,35 @@ def gradCE(X, Y, w):
     h1 = reluPrime(z1)
     z2 = (W2.T.dot(h1).T + b2).T
     yhat = softmax(z2)
-    return np.sum(yhat-Y)  # grad_w2 #[grad_w1, grad_b1, grad_w2, grad_b2]
+
+    yHatMinusY = yhat - Y
+
+    g = ((yHatMinusY @ W2.T) * reluPrime(z1.T)).T
+
+    grad_w2 = yHatMinusY.T @ h1.T
+    grad_b2 = yHatMinusY 
+    grad_w1 = g @ X.T
+    grad_b1 = g
+
+    return np.array([grad_w1, grad_b1, grad_w2, grad_b2])
+
+def oneForwardProp(X, w):
+    W1, b1, W2, b2 = unpack(w)
+
+    z1 = W1.dot(X) + b1
+    h1 = reluPrime(z1)
+    z2 = W2.dot(h1) + b2
+    yhat = softmax(z2)
+
+    
+    # yHatMinusY = yhat - 
+
+    # g = ((yHatMinusY @ W2.T) * reluPrime(z1.T)).T
+
+    # grad_w2 = yHatMinusY.T @ h1.T
+    # grad_b2 = yHatMinusY 
+    # grad_w1 = g @ X.T
+    # grad_b1 = g
 
 
 def backprop(X, Y, w):
@@ -133,8 +161,6 @@ def backprop(X, Y, w):
 
 # Given training and testing datasets and an initial set of weights/biases b,
 # train the NN. Then return the sequence of w's obtained during SGD.
-
-
 def train(X, y, testX, testY, w, E=30, alpha=0.00000, beta=0.00001, kappa=0.0025, n_hat=64):
 
     m = X.shape[0]  # m is number of features
@@ -184,6 +210,7 @@ if __name__ == "__main__":
         testX, testY = loadData("test")
         optX, optY = loadData("validation")
 
+    print("Loaded Data")
     # # Initialize weights randomly
     W1 = 2*(np.random.random(size=(NUM_INPUT, NUM_HIDDEN)) /
             NUM_INPUT**0.5) - 1./NUM_INPUT**0.5
@@ -196,13 +223,14 @@ if __name__ == "__main__":
     # Check that the gradient is correct on just a few examples (randomly drawn)## Use check grad on each individualW1, W2, b1, b2
 
     idxs = np.random.permutation(trainX.shape[0])[0:NUM_CHECK]
+    print(fCE(np.atleast_2d(trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w))
     print(scipy.optimize.check_grad(lambda w_: fCE(np.atleast_2d(trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w_),
                                     lambda w_: gradCE(np.atleast_2d(
                                         trainX[idxs, :]).T, np.atleast_2d(trainY[idxs, :]), w_),
                                     w))
 
-    # Train the network and obtain the sequence of w's obtained using SGD.
-    ws = train(trainX.T, trainY, optX.T, optY, w)
+    # # Train the network and obtain the sequence of w's obtained using SGD.
+    # ws = train(trainX.T, trainY, optX.T, optY, w)
 
-    # Plot the SGD trajectory
-    plotSGDPath(trainX.T, trainY, ws)
+    # # Plot the SGD trajectory
+    # plotSGDPath(trainX.T, trainY, ws)

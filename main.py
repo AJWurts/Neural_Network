@@ -135,11 +135,10 @@ def predict(X, w):
 def fCE(X, Y, w):
     pred = predict(X, w)
     logpred = np.log(pred)
-    sumlogpred = np.sum(Y @ logpred, axis=0)
-    total_sum = np.sum(sumlogpred)
+    sumlogpred = np.sum(Y.T * logpred)
 
-    cost = (-1/X.shape[1]) * total_sum
-    return 2000000#ost
+    cost = (-1/X.shape[1]) * sumlogpred
+    return cost
 
 
 def score(X, y, w):

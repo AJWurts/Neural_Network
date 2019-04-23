@@ -23,13 +23,19 @@ NUM_CHECK = 5  # Number of examples on which to check the gradient
 # and return the individual weights and biases W1, b1, W2, b2.
 # This is useful for performing a gradient check with check_grad.
 
+# W1 = 2*(np.random.random(size=(NUM_INPUT, NUM_HIDDEN)) /
+#         NUM_INPUT**0.5) - 1./NUM_INPUT**0.5
+# b1 = 0.01 * np.ones(NUM_HIDDEN)
+# W2 = 2*(np.random.random(size=(NUM_HIDDEN, NUM_OUTPUT)) /
+#         NUM_HIDDEN**0.5) - 1./NUM_HIDDEN**0.5
+# b2 = 0.01 * np.ones(NUM_OUTPUT)
 
 def unpack(w):
-    W1 = w[:NUM_INPUT * NUM_HIDDEN].reshape((NUM_INPUT, NUM_HIDDEN))
+    W1 = w[:NUM_INPUT * NUM_HIDDEN].reshape((NUM_HIDDEN,NUM_INPUT ))
     b1 = w[NUM_INPUT * NUM_HIDDEN:NUM_INPUT *
            NUM_HIDDEN + NUM_HIDDEN].reshape((NUM_HIDDEN,))
     W2 = w[-(NUM_OUTPUT * NUM_HIDDEN + 10):-
-           NUM_OUTPUT].reshape((NUM_HIDDEN, NUM_OUTPUT))
+           NUM_OUTPUT].reshape((NUM_OUTPUT, NUM_HIDDEN))
     b2 = w[-NUM_OUTPUT:]
     return W1, b1, W2, b2
     # return W1, b1, W2, b2
@@ -38,6 +44,13 @@ def unpack(w):
 # return a vector w containing all of them.
 # This is useful for performing a gradient check with check_grad.
 
+    # w1_flattened = W1.reshape((W1.shape[0] * W1.shape[1],))
+    # w2_flattened = W2.reshape((W2.shape[0] * W2.shape[1],))
+    # b1_flattened = b1.reshape((b1.shape[0],))
+    # b2_flattened = b2.reshape((b2.shape[0],))
+    # result = np.concatenate(
+    #     (w1_flattened, b1_flattened, w2_flattened, b2_flattened))
+    # return result
 
 def pack(W1, b1, W2, b2):
     w1_flattened = W1.reshape((W1.shape[0] * W1.shape[1],))
@@ -104,10 +117,10 @@ def softmax(x):
 def predict(X, w):
     W1, b1, W2, b2 = unpack(w)
 
-    z1 = (W1.T.dot(X.T).T + b1).T
+    z1 = ((W1 @ X).T + b1).T
     h1 = reluPrime(z1)
-    z2 = W2.T.dot(h1).T + b2
-    yhat = softmax(z2.T)
+    z2 = ((W2 @ h1).T + b2)
+    yhat = softmax(z2)
 
     return yhat
 
@@ -118,8 +131,13 @@ def predict(X, w):
 
 
 def fCE(X, Y, w):
-    cost = (-1/X.shape[1]) * np.sum(Y * np.log(predict(X, w)))
-    return cost
+    pred = predict(X, w)
+    logpred = np.log(pred)
+    sumlogpred = np.sum(Y @ logpred, axis=0)
+    total_sum = np.sum(sumlogpred)
+
+    cost = (-1/X.shape[1]) * total_sum
+    return 2000000#ost
 
 
 def score(X, y, w):
@@ -175,22 +193,22 @@ def oneForwardProp(X, Y, w):
 def tryThree(X, y, w):
     W1, b1, W2, b2 = unpack(w)
 
-    z1 = W1 @ X + b1
+    z1 = ((W1 @ X).T + b1).T
     h1 = reluPrime(z1)
-    z2 = W2 @ h1 + b2
+    z2 = ((W2 @ h1).T + b2)
     yhat = softmax(z2)
 
-    yhat_y = yhat - y
+    yhat_y = yhat - y.T
 
-    gT = (yhat - y).T * reluPrime(z1.T)
+    gT = (yhat_y.T @ W2) * reluPrime(z1.T)
     g = gT.T
 
     grad_w2 = yhat_y @ h1.T
-    grad_b2 = yhat_y
+    grad_b2 = np.mean(yhat_y, axis=1)
     grad_w1 = g @ X.T
-    grad_b1 = g
+    grad_b1 = np.mean(g, axis=1)
 
-    return grad_w2, grad_b2, grad_w1, grad_b1
+    return pack(grad_w2, grad_b2, grad_w1, grad_b1)
 
 
 def backprop(X, Y, w):
@@ -285,21 +303,21 @@ if __name__ == "__main__":
     assert np.all(b2 == b2t)
 
     # Check that the gradient is correct on just a few examples (randomly drawn)## Use check grad on each individualW1, W2, b1, b2
-    # idxs = np.random.permutation(trainX.shape[0])[0:NUM_CHECK]
+    idxs = np.random.permutation(trainX.shape[0])[0:NUM_CHECK]
 
-    tryThree(trainX[0:1,:], trainY[0:1, :], w)
-    # print(scipy.optimize.check_grad(lambda w_: fCE(np.atleast_2d(trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_),
-    #                                 lambda w_: oneForwardProp(np.atleast_2d(
-    #                                     trainX[idxs, :]), np.atleast_2d(trainY[idxs, :]), w_),
-    #                                 w))
-    # W1g, b1t, W2t, b2t = unpack(oneForwardProp(np.atleast_2d(
-    #     trainX[0:1, :]), np.atleast_2d(trainY[0:1, :]), w))
-    # W1a, b1a, W2a, b2a = unpack(scipy.optimize.approx_fprime(w, lambda w_: fCE(np.atleast_2d(
-    #     trainX[0:1, :]), np.atleast_2d(trainY[0:1, :]), w_), 1.49e-08))
-    # print("W1: ", np.sqrt(np.sum((W1t - W1a) ** 2)))
-    # print("b1: ", np.sqrt(np.sum((b1t - b1a) ** 2)))
-    # print("W2: ", np.sqrt(np.sum((W2t - W2a) ** 2)))
-    # print("b2: ", np.sqrt(np.sum((b2t - b2a) ** 2)))
+    # tryThree(trainX[0:1,:].T, trainY[0:1, :], w)
+    print(scipy.optimize.check_grad(lambda w_: fCE(np.atleast_2d(trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w_),
+                                    lambda w_: tryThree(np.atleast_2d(
+                                        trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w_),
+                                    w))
+    W1g, b1t, W2t, b2t = unpack(tryThree(np.atleast_2d(
+        trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w))
+    W1a, b1a, W2a, b2a = unpack(scipy.optimize.approx_fprime(w, lambda w_: fCE(np.atleast_2d(
+        trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w_), 1.49e-08))
+    print("W1: ", np.sqrt(np.sum((W1t - W1a) ** 2)))
+    print("b1: ", np.sqrt(np.sum((b1t - b1a) ** 2)))
+    print("W2: ", np.sqrt(np.sum((W2t - W2a) ** 2)))
+    print("b2: ", np.sqrt(np.sum((b2t - b2a) ** 2)))
 
     # # # Train the network and obtain the sequence of w's obtained using SGD.
     # ws = train(trainX.T, trainY, optX.T, optY, w)

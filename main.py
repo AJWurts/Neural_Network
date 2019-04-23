@@ -103,6 +103,8 @@ def plotSGDPath(trainX, trainY, ws):
 
     plt.show()
 
+def relu(X):
+    return np.where(X > 0, X, 0)
 
 def reluPrime(X):
     return np.where(X >= 0, 1.0, 0.0)
@@ -118,7 +120,7 @@ def predict(X, w):
     W1, b1, W2, b2 = unpack(w)
 
     z1 = ((W1 @ X).T + b1).T
-    h1 = reluPrime(z1)
+    h1 = relu(z1)
     z2 = ((W2 @ h1).T + b2)
     yhat = softmax(z2)
 
@@ -194,7 +196,7 @@ def tryThree(X, y, w):
     W1, b1, W2, b2 = unpack(w)
 
     z1 = ((W1 @ X).T + b1).T
-    h1 = reluPrime(z1)
+    h1 = relu(z1)
     z2 = ((W2 @ h1).T + b2)
     yhat = softmax(z2)
 
@@ -310,10 +312,10 @@ if __name__ == "__main__":
                                     lambda w_: tryThree(np.atleast_2d(
                                         trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w_),
                                     w))
-    W1g, b1t, W2t, b2t = unpack(tryThree(np.atleast_2d(
+    W1t, b1t, W2t, b2t = unpack(tryThree(np.atleast_2d(
         trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w))
     W1a, b1a, W2a, b2a = unpack(scipy.optimize.approx_fprime(w, lambda w_: fCE(np.atleast_2d(
-        trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w_), 1.49e-08))
+        trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w_), 1.49e-10))
     print("W1: ", np.sqrt(np.sum((W1t - W1a) ** 2)))
     print("b1: ", np.sqrt(np.sum((b1t - b1a) ** 2)))
     print("W2: ", np.sqrt(np.sum((W2t - W2a) ** 2)))

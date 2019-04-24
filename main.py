@@ -9,27 +9,6 @@ NUM_HIDDEN = 40  # Number of hidden neurons
 NUM_OUTPUT = 10  # Number of output neurons
 NUM_CHECK = 5  # Number of examples on which to check the gradient
 
-"""
-    W1 = 2*(np.random.random(size=(NUM_INPUT, NUM_HIDDEN)) /
-            NUM_INPUT**0.5) - 1./NUM_INPUT**0.5
-    b1 = 0.01 * np.ones(NUM_HIDDEN)
-    W2 = 2*(np.random.random(size=(NUM_HIDDEN, NUM_OUTPUT)) /
-            NUM_HIDDEN**0.5) - 1./NUM_HIDDEN**0.5
-    b2 = 0.01 * np.ones(NUM_OUTPUT)
-    w = pack(W1, b1, W2, b2)
-    W1t, b1t, W2t, b2t = unpack(pack(W1, b1, W2, b2))"""
-
-# Given a vector w containing all the weights and biased vectors, extract
-# and return the individual weights and biases W1, b1, W2, b2.
-# This is useful for performing a gradient check with check_grad.
-
-# W1 = 2*(np.random.random(size=(NUM_INPUT, NUM_HIDDEN)) /
-#         NUM_INPUT**0.5) - 1./NUM_INPUT**0.5
-# b1 = 0.01 * np.ones(NUM_HIDDEN)
-# W2 = 2*(np.random.random(size=(NUM_HIDDEN, NUM_OUTPUT)) /
-#         NUM_HIDDEN**0.5) - 1./NUM_HIDDEN**0.5
-# b2 = 0.01 * np.ones(NUM_OUTPUT)
-
 def unpack(w):
     W1 = w[:NUM_INPUT * NUM_HIDDEN].reshape((NUM_HIDDEN,NUM_INPUT ))
     b1 = w[NUM_INPUT * NUM_HIDDEN:NUM_INPUT *
@@ -43,15 +22,6 @@ def unpack(w):
 # Given individual weights and biases W1, b1, W2, b2, concatenate them and
 # return a vector w containing all of them.
 # This is useful for performing a gradient check with check_grad.
-
-    # w1_flattened = W1.reshape((W1.shape[0] * W1.shape[1],))
-    # w2_flattened = W2.reshape((W2.shape[0] * W2.shape[1],))
-    # b1_flattened = b1.reshape((b1.shape[0],))
-    # b2_flattened = b2.reshape((b2.shape[0],))
-    # result = np.concatenate(
-    #     (w1_flattened, b1_flattened, w2_flattened, b2_flattened))
-    # return result
-
 def pack(W1, b1, W2, b2):
     w1_flattened = W1.reshape((W1.shape[0] * W1.shape[1],))
     w2_flattened = W2.reshape((W2.shape[0] * W2.shape[1],))
@@ -62,8 +32,6 @@ def pack(W1, b1, W2, b2):
     return result
 
 # Load the images and labels from a specified dataset (train or test).
-
-
 def loadData(which):
     images = np.load("mnist_{}_images.npy".format(which))
     labels = np.load("mnist_{}_labels.npy".format(which))
@@ -71,33 +39,34 @@ def loadData(which):
 
 
 def plotSGDPath(trainX, trainY, ws):
-
+    def zed_f(x, y):
+        return fCE(trainX[:,:2500], trainY[:2500], (clf.inverse_transform([x, y])))
 
     fig = plt.figure()
     ax = fig.gca(projection='3d')
 
-    # Use This function
-    # Also use inverse_transform too
 
     clf = PCA(n_components=2)
     redux = clf.fit_transform(ws, trainX)
 
+    ## Need to convert (x,y) => 31830 weights using inverse transform
     # Compute the CE loss on a grid of points (corresonding to different w).
-    axis1 = np.arange(-np.pi, +np.pi, 0.05)  # Just an example
-    axis2 = np.arange(-np.pi, +np.pi, 0.05)  # Just an example
+    axis1 = np.linspace(np.min(redux[:,0]) - 10, np.max(redux[:,0])+5, 20)  # Just an 
+    axis2 = np.linspace(np.min(redux[:,1] )- 4, np.max(redux[:,1]) + 4, 20)  # Just an 
     Xaxis, Yaxis = np.meshgrid(axis1, axis2)
+
     # Base axis on weights for 15000
     Zaxis = np.zeros((len(axis1), len(axis2)))
     for i in range(len(axis1)):
         for j in range(len(axis2)):
-            Zaxis[i, j] = toyFunction(Xaxis[i, j], Yaxis[i, j])
+            Zaxis[i, j] = zed_f(Xaxis[i,j], Yaxis[i, j])
     # Keep alpha < 1 so we can see the scatter plot too.
     ax.plot_surface(Xaxis, Yaxis, Zaxis, alpha=0.6)
 
     # Now superimpose a scatter plot showing the weights during SGD.
-    Xaxis = 2*np.pi*np.random.random(8) - np.pi  # Just an example
-    Yaxis = 2*np.pi*np.random.random(8) - np.pi  # Just an example
-    Zaxis = toyFunction(Xaxis, Yaxis)
+    Xaxis = redux[:,0] #Just an example
+    Yaxis = redux[:,1]
+    Zaxis = [fCE(trainX[:,:2500], trainY[:2500],ws[i,:]) for i in range(len(ws))]
     ax.scatter(Xaxis, Yaxis, Zaxis, color='r')
 
     plt.show()
@@ -292,23 +261,20 @@ if __name__ == "__main__":
     # Check that the gradient is correct on just a few examples (randomly drawn)## Use check grad on each individualW1, W2, b1, b2
     idxs = np.random.permutation(trainX.shape[0])[0:1]
 
-    # gradCE(trainX[0:1,:].T, trainY[0:1, :], w)
-    # print(scipy.optimize.check_grad(lambda w_: fCE(np.atleast_2d(trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w_),
-    #                                 lambda w_: gradCE(np.atleast_2d(
-    #                                     trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w_),
-    #                                 w))
+    print(scipy.optimize.check_grad(lambda w_: fCE(np.atleast_2d(trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w_),
+                                    lambda w_: gradCE(np.atleast_2d(
+                                        trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w_),
+                                    w))
+    # Looks at the weights individually. Commented out to increase run speed
     # # W1t, b1t, W2t, b2t = unpack(gradCE(np.atleast_2d(
     #     trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w))
     # W1a, b1a, W2a, b2a = unpack(scipy.optimize.approx_fprime(w, lambda w_: fCE(np.atleast_2d(
     #     trainX[idxs, :].T), np.atleast_2d(trainY[idxs, :]), w_), 1.49e-10))
     # # print("total: ", )
-    # print("W1: ", np.sqrt(np.sum((W1t - W1a) ** 2)))
-    # print("b1: ", np.sqrt(np.sum((b1t - b1a) ** 2)))
-    # print("W2: ", np.sqrt(np.sum((W2t - W2a) ** 2)))
-    # print("b2: ", np.sqrt(np.sum((b2t - b2a) ** 2)))
+
 
     # # Train the network and obtain the sequence of w's obtained using SGD.
-    _, ws = train(trainX.T, trainY, optX.T, optY, w) 
+    w, ws = train(trainX.T, trainY, testX.T, testY, w) 
     # print(findBestHyperparameters(trainX, trainY, optX, optY, w))
     # print(ws.shape)
     np.save("ws.npy", ws)

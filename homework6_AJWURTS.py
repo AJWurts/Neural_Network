@@ -98,8 +98,6 @@ def predict(X, w):
 # and bias terms w, compute and return the cross-entropy (CE) loss. You might
 # want to extend this function to return multiple arguments (in which case you
 # will also need to modify slightly the gradient check code below).
-
-
 def fCE(X, Y, w):
     pred = predict(X, w)
     logpred = np.log(pred)
@@ -117,10 +115,6 @@ def score(X, y, w):
 # and bias terms w, compute and return the gradient of fCE. You might
 # want to extend this function to return multiple arguments (in which case you
 # will also need to modify slightly the gradient check code below).
-
-
-
-
 def gradCE(X, y, w):
     W1, b1, W2, b2 = unpack(w)
 
@@ -142,29 +136,8 @@ def gradCE(X, y, w):
     return pack(grad_w1, grad_b1, grad_w2, grad_b2)
 
 
-def backprop(X, Y, w):
-    W1, b1, W2, b2 = unpack(w)
-
-    z1 = (W1.T.dot(X).T + b1).T
-    h1 = reluPrime(z1)
-    z2 = (W2.T.dot(h1).T + b2).T
-    yhat = softmax(z2)
-
-    yHatMinusY = yhat - Y
-
-    g = ((yHatMinusY @ W2.T) * reluPrime(z1.T)).T
-
-    grad_w2 = yHatMinusY.T @ h1.T
-    grad_b2 = np.mean(yHatMinusY, axis=0)
-    grad_w1 = g @ X.T
-    grad_b1 = np.mean(g, axis=1)
-
-    return grad_w1, grad_b1, grad_w2, grad_b2
-
 # Given training and testing datasets and an initial set of weights/biases b,
 # train the NN. Then return the sequence of w's obtained during SGD.
-
-# # def train(X, y, testX, testY, w, E=30, alpha=0.00000, beta=0.00001, kappa=0.0025, n_hat=64):
 def train(X, y, testX, testY, w, E=30, alpha=0, beta=0.0001, kappa=0.01, n_hat=8):
 
     m = X.shape[0]  # m is number of features
@@ -175,6 +148,7 @@ def train(X, y, testX, testY, w, E=30, alpha=0, beta=0.0001, kappa=0.01, n_hat=8
     X, y = X[:,p], y[p]
     w_history = np.empty((E, w.shape[0]))
     for j in range(E):
+      
         for i in range(0, n, n_hat):
             if i + n_hat > n:
                 n_hat = n - i
@@ -271,10 +245,9 @@ if __name__ == "__main__":
 
     # # Train the network and obtain the sequence of w's obtained using SGD.
     w, ws = train(trainX.T, trainY, testX.T, testY, w) 
-    # np.save("w.npy", w)
+
+    ## Uncomment line below to run findBestHyperparameters function
     # print(findBestHyperparameters(trainX, trainY, optX, optY, w))
-    # print(ws.shape)
-    # np.save("ws.npy", ws)
-    # ws = np.load("ws.npy")
+    
     # Plot the SGD trajectory
     plotSGDPath(trainX.T, trainY, ws)

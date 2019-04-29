@@ -1,3 +1,5 @@
+# Written by Alexander Wurts for CS434X
+
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
@@ -9,6 +11,8 @@ NUM_HIDDEN = 40  # Number of hidden neurons
 NUM_OUTPUT = 10  # Number of output neurons
 NUM_CHECK = 5  # Number of examples on which to check the gradient
 
+
+# Unpacks all network weights and places them in correctly sized arrays.
 def unpack(w):
     W1 = w[:NUM_INPUT * NUM_HIDDEN].reshape((NUM_HIDDEN,NUM_INPUT ))
     b1 = w[NUM_INPUT * NUM_HIDDEN:NUM_INPUT *
@@ -17,11 +21,8 @@ def unpack(w):
            NUM_OUTPUT].reshape((NUM_OUTPUT, NUM_HIDDEN))
     b2 = w[-NUM_OUTPUT:]
     return W1, b1, W2, b2
-    # return W1, b1, W2, b2
 
-# Given individual weights and biases W1, b1, W2, b2, concatenate them and
-# return a vector w containing all of them.
-# This is useful for performing a gradient check with check_grad.
+# Packs all network weights into a single vector
 def pack(W1, b1, W2, b2):
     w1_flattened = W1.reshape((W1.shape[0] * W1.shape[1],))
     w2_flattened = W2.reshape((W2.shape[0] * W2.shape[1],))
@@ -38,6 +39,7 @@ def loadData(which):
     return images, labels
 
 
+# Uses PCA to visualize the training process
 def plotSGDPath(trainX, trainY, ws):
     def zed_f(x, y):
         return fCE(trainX[:,:2500], trainY[:2500], (clf.inverse_transform([x, y])))
@@ -55,7 +57,7 @@ def plotSGDPath(trainX, trainY, ws):
     axis2 = np.linspace(np.min(redux[:,1] )- 4, np.max(redux[:,1]) + 4, 20)  # Just an 
     Xaxis, Yaxis = np.meshgrid(axis1, axis2)
 
-    # Base axis on weights for 15000
+    # Base axis on weights for 2500
     Zaxis = np.zeros((len(axis1), len(axis2)))
     for i in range(len(axis1)):
         for j in range(len(axis2)):
@@ -94,10 +96,7 @@ def predict(X, w):
 
     return yhat
 
-# Given training images X, associated labels Y, and a vector of combined weights
-# and bias terms w, compute and return the cross-entropy (CE) loss. You might
-# want to extend this function to return multiple arguments (in which case you
-# will also need to modify slightly the gradient check code below).
+# Computes cross entropy for all values in X, Y
 def fCE(X, Y, w):
     pred = predict(X, w)
     logpred = np.log(pred)
@@ -107,14 +106,12 @@ def fCE(X, Y, w):
     return cost
 
 
+# Computes a percent accuracy for a set of images X.
 def score(X, y, w):
     result = np.argmax(predict(X, w), axis=0) == np.argmax(y, axis=1)
     return np.sum(result) / result.shape[0]
 
-# Given training images X, associated labels Y, and a vector of combined weights
-# and bias terms w, compute and return the gradient of fCE. You might
-# want to extend this function to return multiple arguments (in which case you
-# will also need to modify slightly the gradient check code below).
+# Calculates the gradients for all weights in the network
 def gradCE(X, y, w):
     W1, b1, W2, b2 = unpack(w)
 
@@ -136,8 +133,7 @@ def gradCE(X, y, w):
     return pack(grad_w1, grad_b1, grad_w2, grad_b2)
 
 
-# Given training and testing datasets and an initial set of weights/biases b,
-# train the NN. Then return the sequence of w's obtained during SGD.
+# Uses Stochastic Gradient Descent to train the neural network given a training set, and outputs the testing accuracy after every epoch. Hyperparameters are specified using alpha, beta, kappa, and n_hat for size of each batch.
 def train(X, y, testX, testY, w, E=30, alpha=0, beta=0.0001, kappa=0.01, n_hat=8):
 
     m = X.shape[0]  # m is number of features
@@ -158,24 +154,28 @@ def train(X, y, testX, testY, w, E=30, alpha=0, beta=0.0001, kappa=0.01, n_hat=8
             grad_w1, grad_b1, grad_w2, grad_b2 = unpack(gradCE(X_batch, y_batch, w))
             W1, b1, W2, b2 = unpack(w)
 
+            # Subtracts gradients from weights and adds L1/L2 grdularlization
             W1 -= kappa * grad_w1 + beta * W1 + alpha * np.sign(W1)
             b1 -= kappa * grad_b1 + beta * b1 + alpha * np.sign(b1)
             W2 -= kappa * grad_w2 + beta * W2 + alpha * np.sign(W2)
             b2 -= kappa * grad_b2 + beta * b2 + alpha * np.sign(b2)
             w = pack(W1, b1, W2, b2)
 
-            # print("batch:", i)
         w_history[j,:] = w
         print("Epoch:", j)
         print("Test Score:", score(testX, testY, w))
         print("Test CE:", fCE(testX, testY, w))
 
-
     return w, w_history
 
 
+# Calculates the best hyperparamters using a greedy algorithm and a given set of options.
 def findBestHyperparameters(trainX, trainY, optX, optY, W, useAmt=10000):
 
+    #Starts with Kappa then moves to beta and alpha
+    # Finds the optimal value for kappa then locks it in
+    # Look for the optimal value of beta, given the locked in kappa and so on
+    # Eventaully finds a high accuracy solution.
     pv = np.array([0, 0.00005, 0.0001, 0.0025, 0.01, 0.05])
 
     n_hat = np.array([8, 16, 32, 64])
@@ -183,6 +183,7 @@ def findBestHyperparameters(trainX, trainY, optX, optY, W, useAmt=10000):
 
     w = np.array([0,0,0,0,0])
 
+    # Optimizing Alpha, Beta, and Kappa
     for key, i in enumerate([1,2,4]):
         values = []
         for j in range(6):
@@ -194,7 +195,8 @@ def findBestHyperparameters(trainX, trainY, optX, optY, W, useAmt=10000):
             values.append(fce)
         print(values)
         w[key] = np.argmin(np.array(values))
-    # w = np.array([3,0,0,0,0])
+
+    # Optimizing sbatch size and number of spochs
     for key, i in enumerate([1, 2]):
         values = []
         for j in range(4):
@@ -206,6 +208,7 @@ def findBestHyperparameters(trainX, trainY, optX, optY, W, useAmt=10000):
         
         w[key + 3] = np.argmin(np.array(values))
     
+    # Returns optimized hyperparamters
     return pv[w[0]], pv[w[1]], pv[w[2]], n_hat[w[3]], E[w[4]], w
     
 
